@@ -12,7 +12,7 @@ import {
   Routes
 } from "discord.js";
 import { DateTime } from "luxon";
-import { readdirSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import {
   IBotHelperClient,
@@ -197,22 +197,37 @@ class DiscordBotHelper {
   setPrefixCommands(): void {
     console.log(`Setting prefix commands`);
     this.client.prefixCommands = new Collection();
-    const upDir = path.join(__dirname)
-    const commandFiles = readdirSync(upDir + "/PrefixCommands").filter(
-      (e) => e.endsWith(".ts") || e.endsWith(".js")
-    );
     this.client.prefixCommandsInfo = [];
-    for (const file of commandFiles) {
-      const command = require(`./PrefixCommands/${file}`);
-      const commandObj: IPrefixCommand = {
-        name: command.name,
-        description: command.description
-      };
-      this.client.prefixCommandsInfo.push(commandObj);
-      this.client.prefixCommands.set(command.name, command);
-    }
+  
+    const prefixCommandsDir = path.join(__dirname, "PrefixCommands"); // Adjust folder name here
+  
+    const readCommandsRecursive = (dir: string) => {
+      const files = readdirSync(dir);
+      files.forEach(file => {
+        const filePath = path.join(dir, file);
+        const fileStat = statSync(filePath);
+        if (fileStat.isDirectory()) {
+          // Recursive call if it's a directory
+          readCommandsRecursive(filePath);
+        } else if (file.endsWith(".ts") || file.endsWith(".js")) {
+          const command:any = require(filePath) 
+          const commandObj: IPrefixCommand = {
+            name: command.name,
+            description: command.description
+          };
+          this.client.prefixCommandsInfo.push(commandObj);
+          this.client.prefixCommands.set(command.name, command);
+        }
+      });
+    };
+  
+    readCommandsRecursive(prefixCommandsDir);
+  
     console.log(`Finished setting prefix commands`);
   }
+  
+  
+  
 
   async updateDiscordCommands(): Promise<void> {
     const rest = new REST({ version: "10" }).setToken(this.token);
@@ -309,17 +324,25 @@ class DiscordBotHelper {
         if (message.author.bot || !message.content) {
           return;
         }
-        const command = message.content.toLowerCase();
-        if (!command.startsWith(this.commandPrefix.toLowerCase())) {
+        const pephix = message.content.toLowerCase();
+        if (!pephix.startsWith(this.commandPrefix.toLowerCase())) {
           return;
         }
-
-        const commandText = command
-          .replace(this.commandPrefix, "")
-          .split(" ")[0];
+        const commandName:string = message.content.toLowerCase().split(" ")[0].slice(this.commandPrefix.length);
+        const command:any = this.client.prefixCommands.get(commandName)
+          || this.client.prefixCommands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
+      
+          if (!command) {
+            return;
+          }
+        console.log(command);
+        const commandText = command.name;
+        // const commandText = command
+        //   .replace(this.commandPrefix, "")
+        //   .split(" ")[0];
         if (!this.checkPrefixCommand(commandText)) {
           message.reply(
-            `Command not recognized, syntax is "${this.commandPrefix}COMMAND INPUT"\n The space is required between the command and the input`
+            `Command not found."${this.commandPrefix}cmd args"\n The space is required between the command and the input`
           );
           return;
         }

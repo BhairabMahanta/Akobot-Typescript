@@ -3,7 +3,7 @@ import { IBotHelperClient } from "../types/helper-types";
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("help".toLowerCase())
+    .setName("heolap".toLowerCase())
     .setDescription(
       'This command will send you the help message for "/" commands'
     ),
